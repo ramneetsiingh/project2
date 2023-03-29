@@ -1,0 +1,10 @@
+*.o
+*.exe
+*.a
+main_server
+main_client1
+main_client2
+.vscode/
+*.log
+address.txt
+.DS_Store

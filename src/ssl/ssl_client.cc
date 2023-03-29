@@ -14,6 +14,9 @@
 #include "logger.h"
 #include "utils.h"
 
+#include "handshake.h"
+#include <unistd.h>
+
 using namespace std;
 
 SslClient::SslClient() {
@@ -47,6 +50,23 @@ int SslClient::connect(const std::string &ip, int port, uint16_t cxntype) {
   }
 
   // IMPLEMENT HANDSHAKE HERE
+
+  try{
+    Handshake handshake(this, cxntype);
+    handshake.send_hello_client();
+    handshake.wait_send_client_key_exchange();
+    handshake.send_wait_finished_client();
+
+    handshake.set_shared_key(this);
+    return 0;
+
+  } catch(std::string& err){
+    cerr << (err) << endl;
+  } catch (std::exception& e){
+    cerr << ("exception caught: " + std::string(e.what())) <<  endl;
+  } catch(...){
+    cerr << ("Exception in SslClient::connect") << endl;
+  }
 
   return -1;
 }

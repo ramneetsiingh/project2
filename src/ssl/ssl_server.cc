@@ -15,6 +15,8 @@
 #include "logger.h"
 #include "utils.h"
 
+#include "handshake.h"
+
 using namespace std;
 
 SslServer::SslServer() {
@@ -70,6 +72,25 @@ SSL* SslServer::accept() {
   this->clients_.push_back(new_ssl_cxn);
 
   // IMPLEMENT HANDSHAKE HERE
+
+  try{
+
+    Handshake handshake(new_ssl_cxn);
+    handshake.wait_send_hello_server();
+    handshake.send_server_key_exchange();
+    handshake.send_server_hello_done();
+    handshake.wait_send_finished_server();
+
+    handshake.set_shared_key(new_ssl_cxn);
+    return new_ssl_cxn;
+
+  } catch(std::string& err){
+    cerr << (err) << endl;
+  } catch (std::exception& e){
+    cerr << ("exception caught: " + std::string(e.what())) <<  endl;
+  } catch(...){
+    cerr << ("Exception in SSslServer::accept") << endl;
+  }
 
   return NULL;
 }
