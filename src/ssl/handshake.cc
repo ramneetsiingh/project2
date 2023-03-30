@@ -6,6 +6,8 @@
 #include "dh.h"
 #include "osrng.h"
 
+#define LOGGING 1
+
 // Generates n random bytes.
 void Utils::generate_rand(const int n, byte* bytes){
     for (int i = 0; i < n; i++) {
@@ -48,11 +50,11 @@ void Utils::rsa_decrypt(CryptoPP::RSA::PrivateKey sk, byte* ciphertext, size_t c
 }
 
 // Handshake constructor Used by server
-Handshake::Handshake(SSL* ssl): doLogging(0), protocol_version(0x01), ssl(ssl){
+Handshake::Handshake(SSL* ssl): doLogging(LOGGING), protocol_version(0x01), ssl(ssl){
 }
 
 // Handshake constructor Used by client
-Handshake::Handshake(SSL* ssl, uint16_t cipher_suite):  doLogging(0),
+Handshake::Handshake(SSL* ssl, uint16_t cipher_suite):  doLogging(LOGGING),
                                                         protocol_version(0x01),
                                                         cipher_suite(cipher_suite),
                                                         ssl(ssl){
@@ -190,7 +192,7 @@ void Handshake::send_hello_client(){
 
     send_record = this->pack_data(SSL::HS_CLIENT_HELLO, send_hb);
     if(this->ssl->send(send_record) == 0){
-        log("Sent: SSL::HS_CLIENT_HELLO");
+        log("[CLIENT] Sent: SSL::HS_CLIENT_HELLO");
     } else{
         throw("[Handshake::send_hello_client] Error: ssl->send(), errno: " + std::to_string(errno));
     }
@@ -211,7 +213,7 @@ void Handshake::wait_send_hello_server(){
     if(recv_hs->msg_type != SSL::HS_CLIENT_HELLO){
         throw("[Handshake::wait_send_hello_server] Invalid Message type: " + std::to_string(recv_hs->msg_type) + ", expected: SSL::HS_CLIENT_HELLO");
     }
-    log("Received: SSL::HS_CLIENT_HELLO");
+    log("[SERVER] Received: SSL::HS_CLIENT_HELLO");
 
     // Setting Cipher Suite
     chosen_cipher_suite = recv_hs->body.client_hello.cipher_suite;
@@ -226,7 +228,7 @@ void Handshake::wait_send_hello_server(){
 
     send_record = this->pack_data(SSL::HS_SERVER_HELLO, send_hb);
     if(this->ssl->send(send_record) == 0){
-        log("Sent: SSL::HS_SERVER_HELLO");
+        log("[SERVER] Sent: SSL::HS_SERVER_HELLO");
     } else{
         throw("[Handshake::wait_send_hello_server] Error: ssl->send(), errno: " + std::to_string(errno));
     }
@@ -249,14 +251,14 @@ void Handshake::send_server_key_exchange(){
         BEREncode(this->dh_g, send_hb.key_exchange.dhe.dh_g, send_hb.key_exchange.dhe.dh_g_size);
         BEREncode(this->dh_server_public_key, send_hb.key_exchange.dhe.dh_Y, send_hb.key_exchange.dhe.dh_Y_size);
 
-        log("p:");
-        log_hex(this->dh_p);
-        log("g:");
-        log_hex(this->dh_g);
-        log("Server Public Key:");
-        log_hex(this->dh_server_public_key);
-        log("Server Private Key:");
-        log_hex(this->dh_server_private_key);
+        // log("p:");
+        // log_hex(this->dh_p);
+        // log("g:");
+        // log_hex(this->dh_g);
+        // log("Server Public Key:");
+        // log_hex(this->dh_server_public_key);
+        // log("Server Private Key:");
+        // log_hex(this->dh_server_private_key);
 
     } else{
         throw "[Handshake::send_server_key_exchange] Invalid Cipher Suite: " + std::to_string(this->cipher_suite);
@@ -264,7 +266,7 @@ void Handshake::send_server_key_exchange(){
 
     send_record = this->pack_data(SSL::HS_SERVER_KEY_EXCHANGE, send_hb);
     if(this->ssl->send(send_record) == 0){
-        log("Sent: SSL::HS_SERVER_KEY_EXCHANGE");
+        log("[SERVER] Sent: SSL::HS_SERVER_KEY_EXCHANGE");
     } else{
         throw("[Handshake::send_server_key_exchange] Error: ssl->send(), errno: " + std::to_string(errno));
     }
@@ -274,7 +276,7 @@ void Handshake::send_server_hello_done(){
     Handshake_Structs::handshake_body send_hb; // Empty
     SSL::Record send_record = this->pack_data(SSL::HS_SERVER_HELLO_DONE, send_hb);
     if(this->ssl->send(send_record) == 0){
-        log("Sent: SSL::HS_SERVER_HELLO_DONE");
+        log("[SERVER] Sent: SSL::HS_SERVER_HELLO_DONE");
     } else{
         throw("[Handshake::send_server_hello_done] Error: ssl->send(), errno: " + std::to_string(errno));
     }
@@ -298,7 +300,7 @@ void Handshake::wait_send_client_key_exchange(){
     if(recv_server_hello->msg_type != SSL::HS_SERVER_HELLO){
         throw("Invalid Message type: " + std::to_string(recv_server_hello->msg_type) + ", expected: SSL::HS_SERVER_HELLO");
     }
-    log("Received: SSL::HS_SERVER_HELLO");
+    log("[CLIENT] Received: SSL::HS_SERVER_HELLO");
     //Saving Server's random
     memcpy(this->server_random, recv_server_hello->body.server_hello.random, 32);
 
@@ -308,7 +310,7 @@ void Handshake::wait_send_client_key_exchange(){
     if(recv_server_key_exchange->msg_type != SSL::HS_SERVER_KEY_EXCHANGE){
         throw("Invalid Message type: " + std::to_string(recv_server_key_exchange->msg_type) + ", expected: SSL::HS_SERVER_KEY_EXCHANGE");
     }
-    log("Received: SSL::HS_SERVER_KEY_EXCHANGE");
+    log("[CLIENT] Received: SSL::HS_SERVER_KEY_EXCHANGE");
 
     //Receving Server Hello Done
     this->ssl->recv(recv_record_hello_done);
@@ -316,7 +318,7 @@ void Handshake::wait_send_client_key_exchange(){
     if(recv_hello_done->msg_type != SSL::HS_SERVER_HELLO_DONE){
         throw("Invalid Message type: " + std::to_string(recv_hello_done->msg_type) + ", expected: SSL::HS_SERVER_HELLO_DONE");
     }
-    log("Received: SSL::HS_SERVER_HELLO_DONE");
+    log("[CLIENT] Received: SSL::HS_SERVER_HELLO_DONE");
 
     if(recv_server_hello->body.server_hello.cipher_suite == this->cipher_suite){
         if(this->cipher_suite == SSL::KE_RSA){
@@ -346,16 +348,16 @@ void Handshake::wait_send_client_key_exchange(){
 
             this->generate_DE_pre_master_key(this->dh_server_public_key, this->dh_client_private_key);
 
-            log("p:");
-            log_hex(this->dh_p);
-            log("g:");
-            log_hex(this->dh_g);
-            log("Client Public Key:");
-            log_hex(this->dh_client_public_key);
-            log("CLient Private Key:");
-            log_hex(this->dh_server_private_key);
-            log("Server Public Key:");
-            log_hex(this->dh_server_public_key);
+            // log("p:");
+            // log_hex(this->dh_p);
+            // log("g:");
+            // log_hex(this->dh_g);
+            // log("Client Public Key:");
+            // log_hex(this->dh_client_public_key);
+            // log("CLient Private Key:");
+            // log_hex(this->dh_server_private_key);
+            // log("Server Public Key:");
+            // log_hex(this->dh_server_public_key);
 
         } else{
             throw "[Handshake::wait_send_client_key_exchange] Invalid Cipher Suite: " + std::to_string(this->cipher_suite);
@@ -366,7 +368,7 @@ void Handshake::wait_send_client_key_exchange(){
 
     send_record = this->pack_data(SSL::HS_CLIENT_KEY_EXCHANGE, send_hb);
     if(this->ssl->send(send_record) == 0){
-        log("Sent: SSL::HS_CLIENT_KEY_EXCHANGE");
+        log("[CLIENT] Sent: SSL::HS_CLIENT_KEY_EXCHANGE");
     } else{
         throw("[Handshake::wait_send_client_key_exchange] Error: ssl->send(), errno: " + std::to_string(errno));
     }
@@ -382,7 +384,7 @@ void Handshake::send_wait_finished_client(){
 
     SSL::Record send_record = this->pack_data(SSL::HS_FINISHED, send_hb);
     if(this->ssl->send(send_record) == 0){
-        log("Sent: SSL::HS_FINISHED");
+        log("[CLIENT] Sent: SSL::HS_FINISHED");
     } else{
         throw("[Handshake::send_finished_client] Error: ssl->send(), errno: " + std::to_string(errno));
     }
@@ -393,7 +395,7 @@ void Handshake::send_wait_finished_client(){
     if(recv_server_finished->msg_type != SSL::HS_FINISHED){
         throw("Invalid Message type: " + std::to_string(recv_server_finished->msg_type) + ", expected: SSL::HS_FINISHED");
     }
-    log("Received: SSL::HS_FINISHED");
+    log("[CLIENT] Received: SSL::HS_FINISHED");
 
     generate_master_key();
 }
@@ -411,7 +413,7 @@ void Handshake::wait_send_finished_server(){
     if(recv_client_key_exchange->msg_type != SSL::HS_CLIENT_KEY_EXCHANGE){
         throw("Invalid Message type: " + std::to_string(recv_client_key_exchange->msg_type) + ", expected: SSL::HS_CLIENT_KEY_EXCHANGE");
     }
-    log("Received: SSL::HS_CLIENT_KEY_EXCHANGE");
+    log("[SERVER] Received: SSL::HS_CLIENT_KEY_EXCHANGE");
 
     // Receiving Client Finished
     this->ssl->recv(recv_record_client_finished);
@@ -419,12 +421,12 @@ void Handshake::wait_send_finished_server(){
     if(recv_client_finished->msg_type != SSL::HS_FINISHED){
         throw("Invalid Message type: " + std::to_string(recv_client_finished->msg_type) + ", expected: SSL::HS_FINISHED");
     }
-    log("Received: SSL::HS_FINISHED");
+    log("[SERVER] Received: SSL::HS_FINISHED");
 
     //Receiving Client Finished
     SSL::Record send_record = this->pack_data(SSL::HS_FINISHED, send_hb);
     if(this->ssl->send(send_record) == 0){
-        log("Sent: SSL::HS_FINISHED");
+        log("[SERVER] Sent: SSL::HS_FINISHED");
     } else{
         throw("[wait_send_finished_server()] Error: ssl->send(), errno: " + std::to_string(errno));
     }
@@ -442,8 +444,8 @@ void Handshake::wait_send_finished_server(){
         //log("Plain:"); log_char_hex((char*)plain, p_size);
     }  else if(this->cipher_suite == SSL::KE_DHE){
         BERDecode(this->dh_client_public_key, recv_client_key_exchange->body.key_exchange.dhe.dh_Y, recv_client_key_exchange->body.key_exchange.dhe.dh_Y_size);
-        log("Client Public Key:");
-        log_hex(this->dh_client_public_key);
+        // log("Client Public Key:");
+        // log_hex(this->dh_client_public_key);
         this->generate_DE_pre_master_key(this->dh_client_public_key, this->dh_server_private_key);
         // this->pre_master_secret_DH[5] = 'z'; // Fail Test
     } else{
@@ -451,6 +453,7 @@ void Handshake::wait_send_finished_server(){
     }
 
     generate_master_key();
+    log("Key Exchange Complete :)");
 }
 
 
@@ -470,14 +473,14 @@ void Handshake::generate_master_key(){
     hmac.Final(this->master_secret);
     
     {
-        log("Client Random: ");
-        log_char_hex((char *)(this->client_random), 32);
-        log("Server Random: ");
-        log_char_hex((char *)(this->server_random), 32);
-        log("Pre Master: ");
-        log_char_hex((char *)(this->pre_master_secret_rsa), 48);
-        log("Master: ");
-        log_char_hex((char *)(this->master_secret), 32);
+        // log("Client Random: ");
+        // log_char_hex((char *)(this->client_random), 32);
+        // log("Server Random: ");
+        // log_char_hex((char *)(this->server_random), 32);
+        // log("Pre Master: ");
+        // log_char_hex((char *)(this->pre_master_secret_rsa), 48);
+        // log("Shared master Key: ");
+        // log_char_hex((char *)(this->master_secret), 32);
     }
 }
 
